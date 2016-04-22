@@ -2,7 +2,7 @@
 
 # Python module: ModbusClient class (Client ModBus/TCP class 1)
 
-from pyModbusTCP import constants as const
+from . import constants as const
 import re
 import socket
 import select
@@ -19,7 +19,7 @@ class ModbusClient:
         """Constructor
 
         Modbus server params (host, port) can be set here or with host(), port()
-        functions. Same for debug option. 
+        functions. Same for debug option.
 
         Use functions avoid to launch ValueError except if params is incorrect.
 
@@ -121,21 +121,15 @@ class ModbusClient:
         # when hostname change ensure old socket is close
         self.close()
         # IPv4 ?
-        try:
-            socket.inet_pton(socket.AF_INET, hostname)
+        if re.match("^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$", hostname):
             self.__hostname = hostname
             return self.__hostname
-        except socket.error:
-            pass
         # IPv6 ?
-        try:
-            socket.inet_pton(socket.AF_INET6, hostname)
+        elif re.match("^(?:[A-F0-9]{1,4}:){7}[A-F0-9]{1,4}$", hostname):
             self.__hostname = hostname
             return self.__hostname
-        except socket.error:
-            pass
         # DNS name ?
-        if re.match("^[a-z][a-z0-9\.\-]+$", hostname):
+        elif re.match("^[a-z][a-z0-9\.\-]+$", hostname):
             self.__hostname = hostname
             return self.__hostname
         else:

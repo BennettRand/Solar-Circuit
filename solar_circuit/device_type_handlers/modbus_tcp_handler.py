@@ -3,6 +3,8 @@ import time
 import socket
 from circuits import Component, Event
 
+from solar_circuit.devices import tcp_devices
+
 class ModbusTCPHandler(Component):
 	MODBUS_PORT = 502
 	MODBUS_TIMEOUT = 5
@@ -10,6 +12,7 @@ class ModbusTCPHandler(Component):
 	def __init__(self):
 		super(ModbusTCPHandler, self).__init__()
 		self.found_ips = set()
+		self.devices = []
 
 	def _get_ip_scan_list(self):
 		return {'127.0.0.1', '0.0.0.0'} - self.found_ips
@@ -30,4 +33,8 @@ class ModbusTCPHandler(Component):
 			else:
 				logging.info("%s has port %s open.", ip, self.MODBUS_PORT)
 				s.close()
+				d = tcp_devices.ModbusTCPDevice(ip)
+				d.run()
+				d.register(self) # Be sure to register _after_ running
+				self.devices.append(d)
 				self.found_ips.add(ip)
