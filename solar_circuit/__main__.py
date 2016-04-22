@@ -1,10 +1,12 @@
 import circuits
+import logging
 
 from . import device_manager
 
 DEBUG = True
 
 def main():
+	logging.getLogger().setLevel(logging.INFO)
 	base_components = device_manager.DeviceManager()
 	if DEBUG:
 		base_components += circuits.Debugger()
