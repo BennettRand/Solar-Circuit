@@ -3,7 +3,7 @@ import logging
 
 from . import device_manager
 
-DEBUG = True
+DEBUG = False
 
 def main():
 	logging.getLogger().setLevel(logging.INFO)

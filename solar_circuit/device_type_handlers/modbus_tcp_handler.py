@@ -15,7 +15,7 @@ class ModbusTCPHandler(Component):
 		self.devices = []
 
 	def _get_ip_scan_list(self):
-		return {'127.0.0.1', '0.0.0.0'} - self.found_ips
+		return {'128.193.47.4', '128.193.47.6', '128.193.47.46', '128.193.47.47'} - self.found_ips
 
 	def started(self, *args):
 		logging.info("ModbusTCPHandler started")
@@ -34,7 +34,7 @@ class ModbusTCPHandler(Component):
 				logging.info("%s has port %s open.", ip, self.MODBUS_PORT)
 				s.close()
 				d = tcp_devices.ModbusTCPDevice(ip)
-				d.run()
+				d.started()
 				d.register(self) # Be sure to register _after_ running
 				self.devices.append(d)
 				self.found_ips.add(ip)
