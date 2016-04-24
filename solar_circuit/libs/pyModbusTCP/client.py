@@ -129,7 +129,7 @@ class ModbusClient:
             self.__hostname = hostname
             return self.__hostname
         # DNS name ?
-        elif re.match("^[a-z][a-z0-9\.\-]+$", hostname):
+        elif re.match("^[a-zA-Z][a-zA-Z0-9\.\-]+$", hostname):
             self.__hostname = hostname
             return self.__hostname
         else:
