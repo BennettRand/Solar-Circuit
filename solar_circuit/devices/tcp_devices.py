@@ -43,7 +43,7 @@ class ModbusTCPDevice(Component):
 
 	def sample(self):
 		logging.info("sampling from %s", self.sn)
-		to_sample = [(0,100), (0x2000, 48)]
+		to_sample = [(0,47)]
 		for t in to_sample:
 			try:
 				regs = self.conn.read_holding_registers(t[0], t[1])
