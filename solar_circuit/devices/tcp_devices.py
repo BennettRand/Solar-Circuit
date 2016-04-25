@@ -9,6 +9,7 @@ import random
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
 from solar_circuit.libs import prettytable
 from solar_circuit.utility.helpers import *
+from solar_circuit.utility import formats
 from . import sample, sample_success
 
 TCP_DEV_NAMES ={}
@@ -77,14 +78,25 @@ class Shark100(ModbusTCPDevice):
 	def __init__(self, ip):
 		super(Shark100, self).__init__(ip)
 		self.registers = [(0x0000, 47),
-						  (0x0383, 6),
-						  (0x03E7, 30),
-						  (0x044B, 18),
-						  (0x07CF, 20),
-						  (0x0BB7, 34),
-						  (0x0C1B, 34),
-						  (0x1003, 6),
-						  (0x1387, 4)]
+						  (0x0383, 6)]
+						  # (0x03E7, 30),
+						  # (0x044B, 18),
+						  # (0x07CF, 20),
+						  # (0x0BB7, 34),
+						  # (0x0C1B, 34),
+						  # (0x1003, 6),
+						  # (0x1387, 4)]
 		
 	def sample_success(self, addr, regs):
-		logging.info(regs)
+		if addr == 0x0000:
+			# logging.info("Name: %s", formats.modbus_string(regs[0:8]))
+			self.sn = formats.modbus_string(regs[8:16])
+			# logging.info("Type: %s", formats.bitfield(regs[16:17]))
+			# logging.info("Firmware: %s", formats.modbus_string(regs[17:19]))
+			# logging.info("Map Version: %s", formats.uint16(regs[19:20]))
+			# logging.info("Meter Configuration: %s", formats.bitfield(regs[20:21]))
+			# logging.info("ASIC Version: %s", formats.uint16(regs[21:22]))
+		elif addr == 0x0383:
+			logging.info("Power: %s", formats.float32(regs[0:2]))
+			logging.info("VAR: %s", formats.float32(regs[2:4]))
+			logging.info("VA: %s", formats.float32(regs[4:6]))
