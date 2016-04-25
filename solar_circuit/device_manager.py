@@ -1,6 +1,6 @@
 import logging
 import time
-from circuits import Component, Event, Timer
+from circuits import Component, Event, Timer, Worker, task
 
 from .device_type_handlers.modbus_tcp_handler import ModbusTCPHandler
 
@@ -15,6 +15,7 @@ class DeviceManager(Component):
 		self.modbus_tcp_handler = ModbusTCPHandler().register(self)
 		self.active = False
 		self.discovery_timer = None
+		self.sample_worker = None
 
 	def discover(self):
 		logging.info("Discovery tick")
@@ -24,6 +25,7 @@ class DeviceManager(Component):
 		logging.info("Initializing DeviceManager")
 		logging.info("Initializing discovery")
 		self.active = True
+		self.sample_worker = Worker(channel="sample_worker").register(self)
 		self.discovery_timer = Timer(self.DISCOVERY_INTERVAL, discover(),
 									 persist=True).register(self)
 		self.fire(discover())

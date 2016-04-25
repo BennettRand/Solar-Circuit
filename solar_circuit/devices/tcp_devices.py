@@ -3,7 +3,7 @@ import time
 import socket
 import struct
 import codecs
-from circuits import Component, Event, Timer
+from circuits import Component, Event, Timer, Worker, task
 import random
 
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
@@ -31,10 +31,10 @@ class ModbusTCPDevice(Component):
 		self.registers = []
 		self.conn = None
 		self._set_channel()
-		
+
 	def _set_channel(self):
 		self.channel = self.__class__.__name__ + str(id(self))
-		
+
 	def started(self, *args):
 		self.conn = ModbusClient(host=self.ip, port=self.MODBUS_PORT,
 								 auto_open=True, auto_close=True)
@@ -42,13 +42,13 @@ class ModbusTCPDevice(Component):
 		self.sample_timer = Timer(self.DEFAULT_INTERVAL + random.uniform(0,1), sample(),
 								  self, persist=True).register(self)
 		return
-	
+
 	def update_interval(self, interval):
 		if self.sample_timer is not None:
 			self.sample_timer.reset(interval + random.uniform(0,1))
 			return True
 		return False
-	
+
 	def sample_success(self, addr, regs):
 		tab = prettytable.PrettyTable()
 		# tab.field_names = [str(x) for x in xrange(0xf)]
@@ -60,7 +60,11 @@ class ModbusTCPDevice(Component):
 		logging.debug("Sample from %s address %s:\n%s", addr, self.sn, tab.get_string())
 
 	def sample(self):
-		logging.info("sampling from %s", self.sn)
+		logging.debug("%s Spawning sample task", self.sn)
+		self.fire(task(self._sample), "sample_worker")
+
+	def _sample(self):
+		logging.info("Sampling from %s", self.sn)
 		for t in self.registers:
 			try:
 				regs = self.conn.read_holding_registers(t[0], t[1])
@@ -86,17 +90,18 @@ class Shark100(ModbusTCPDevice):
 						  # (0x0C1B, 34),
 						  # (0x1003, 6),
 						  # (0x1387, 4)]
-		
+
 	def sample_success(self, addr, regs):
 		if addr == 0x0000:
 			# logging.info("Name: %s", formats.modbus_string(regs[0:8]))
-			self.sn = formats.modbus_string(regs[8:16])
+			self.sn = formats.modbus_string(regs[8:16]).strip(" ")
 			# logging.info("Type: %s", formats.bitfield(regs[16:17]))
 			# logging.info("Firmware: %s", formats.modbus_string(regs[17:19]))
 			# logging.info("Map Version: %s", formats.uint16(regs[19:20]))
 			# logging.info("Meter Configuration: %s", formats.bitfield(regs[20:21]))
 			# logging.info("ASIC Version: %s", formats.uint16(regs[21:22]))
 		elif addr == 0x0383:
+			logging.info(self.sn.center(60, '-'))
 			logging.info("Power: %s", formats.float32(regs[0:2]))
 			logging.info("VAR: %s", formats.float32(regs[2:4]))
 			logging.info("VA: %s", formats.float32(regs[4:6]))
