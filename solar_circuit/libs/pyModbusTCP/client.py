@@ -58,7 +58,7 @@ class ModbusClient:
         # set host
         if host:
             if not self.host(host):
-                raise ValueError("host value error")
+                raise ValueError("host value error", host)
         # set port
         if port:
             if not self.port(port):
@@ -129,7 +129,7 @@ class ModbusClient:
             self.__hostname = hostname
             return self.__hostname
         # DNS name ?
-        elif re.match("^[a-zA-Z][a-zA-Z0-9\.\-]+$", hostname):
+        elif re.match("^[a-zA-Z\-\_][a-zA-Z0-9\.\-\_]+$", hostname):
             self.__hostname = hostname
             return self.__hostname
         else:
