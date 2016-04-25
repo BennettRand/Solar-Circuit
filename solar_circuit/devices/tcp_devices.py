@@ -22,7 +22,8 @@ def register_device_type(cls):
 @register_device_type
 class ModbusTCPDevice(Component):
 	MODBUS_PORT = 502
-	DEFAULT_INTERVAL = 60
+	DEFAULT_INTERVAL = 60 * 15
+	PREFIX = 'XXXX'
 	def __init__(self, ip):
 		super(ModbusTCPDevice, self).__init__()
 		self.sample_timer = None
@@ -43,9 +44,9 @@ class ModbusTCPDevice(Component):
 								  self, persist=True).register(self)
 		return
 
-	def update_interval(self, interval):
+	def update_interval(self, interval, stray=1):
 		if self.sample_timer is not None:
-			self.sample_timer.reset(interval + random.uniform(0,1))
+			self.sample_timer.reset(interval + random.uniform(0,stray))
 			return True
 		return False
 
@@ -65,6 +66,7 @@ class ModbusTCPDevice(Component):
 
 	def _sample(self):
 		logging.info("Sampling from %s", self.sn)
+		start = time.time()
 		for t in self.registers:
 			try:
 				regs = self.conn.read_holding_registers(t[0], t[1])
@@ -75,21 +77,28 @@ class ModbusTCPDevice(Component):
 					logging.warn("%s sent empty sample", self.sn)
 				else:
 					self.fire(sample_success(t[0], regs), self)
+		time_d = time.time() - start
+		logging.debug("Sampling %s took %s", self.sn, time_d)
 		return
 
 @register_device_type
 class Shark100(ModbusTCPDevice):
+	PREFIX = 'SHRK'
 	def __init__(self, ip):
 		super(Shark100, self).__init__(ip)
 		self.registers = [(0x0000, 47),
-						  (0x0383, 6)]
-						  # (0x03E7, 30),
+						  (0x0383, 6),
+						  (0x03E7, 30)]
 						  # (0x044B, 18),
 						  # (0x07CF, 20),
 						  # (0x0BB7, 34),
 						  # (0x0C1B, 34),
 						  # (0x1003, 6),
 						  # (0x1387, 4)]
+
+	def started(self, *args):
+		super(Shark100, self).started(args)
+		self.update_interval(30)
 
 	def sample_success(self, addr, regs):
 		if addr == 0x0000:
@@ -105,3 +114,7 @@ class Shark100(ModbusTCPDevice):
 			logging.info("Power: %s", formats.float32(regs[0:2]))
 			logging.info("VAR: %s", formats.float32(regs[2:4]))
 			logging.info("VA: %s", formats.float32(regs[4:6]))
+		elif addr == 0x03E7:
+			logging.info(self.sn.center(60, '-'))
+			logging.info("Power Factor: %s", formats.float32(regs[24:26]))
+			logging.info("Frequency: %s", formats.float32(regs[26:28]))
