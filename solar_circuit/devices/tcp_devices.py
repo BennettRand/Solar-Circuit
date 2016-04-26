@@ -3,13 +3,15 @@ import time
 import socket
 import struct
 import codecs
-from circuits import Component, Event, Timer, Worker, task
 import random
+import datetime
+from circuits import Component, Event, Timer, Worker, task
 
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
 from solar_circuit.libs import prettytable
 from solar_circuit.utility.helpers import *
 from solar_circuit.utility import formats
+from solar_circuit.sample_database import store_sample
 from . import sample, sample_success
 
 TCP_DEV_NAMES ={}
@@ -80,6 +82,9 @@ class ModbusTCPDevice(Component):
 		time_d = time.time() - start
 		logging.debug("Sampling %s took %s", self.sn, time_d)
 		return
+		
+	def get_dev_id(self):
+		return "{}-{}".format(self.PREFIX, self.sn)
 
 @register_device_type
 class Shark100(ModbusTCPDevice):
@@ -101,6 +106,8 @@ class Shark100(ModbusTCPDevice):
 		self.update_interval(30)
 
 	def sample_success(self, addr, regs):
+		sample = {}
+		timestamp = datetime.datetime.utcnow().isoformat() + "Z"
 		if addr == 0x0000:
 			# logging.info("Name: %s", formats.modbus_string(regs[0:8]))
 			self.sn = formats.modbus_string(regs[8:16]).strip(" ")
@@ -110,11 +117,10 @@ class Shark100(ModbusTCPDevice):
 			# logging.info("Meter Configuration: %s", formats.bitfield(regs[20:21]))
 			# logging.info("ASIC Version: %s", formats.uint16(regs[21:22]))
 		elif addr == 0x0383:
-			logging.info(self.sn.center(60, '-'))
-			logging.info("Power: %s", formats.float32(regs[0:2]))
-			logging.info("VAR: %s", formats.float32(regs[2:4]))
-			logging.info("VA: %s", formats.float32(regs[4:6]))
+			sample["Power"] = formats.float32(regs[0:2])
+			sample["VAR"] = formats.float32(regs[2:4])
+			sample["VA"] = formats.float32(regs[4:6])
 		elif addr == 0x03E7:
-			logging.info(self.sn.center(60, '-'))
-			logging.info("Power Factor: %s", formats.float32(regs[24:26]))
-			logging.info("Frequency: %s", formats.float32(regs[26:28]))
+			sample["PowerFactor"] = formats.float32(regs[24:26])
+			sample["Frequency"] = formats.float32(regs[26:28])
+		self.fire(store_sample(self.get_dev_id(), timestamp, sample))
