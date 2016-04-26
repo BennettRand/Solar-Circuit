@@ -5,6 +5,7 @@ implementations.
 
 from abc import ABCMeta, abstractmethod
 import os
+import bz2
 
 from .utils import with_metaclass
 
@@ -83,17 +84,14 @@ class JSONStorage(Storage):
         super(JSONStorage, self).__init__()
         touch(path)  # Create file if not exists
         self.kwargs = kwargs
+        self.path = path
         self._handle = open(path, 'r+')
 
     def close(self):
         self._handle.close()
 
     def read(self):
-        # Get the file size
-        self._handle.seek(0, 2)
-        size = self._handle.tell()
-
-        if not size:
+        if os.path.getsize(self.path) == 0:
             # File is empty
             return None
         else:
@@ -106,6 +104,45 @@ class JSONStorage(Storage):
         self._handle.write(serialized)
         self._handle.flush()
         self._handle.truncate()
+
+
+class CompressedJSONStorage(JSONStorage):
+	"""
+	Store the data in a compressed JSON file.
+	"""
+
+	def __init__(self, path, **kwargs):
+		"""
+		Create a new instance.
+
+		Also creates the storage file, if it doesn't exist.
+
+		:param path: Where to store the JSON data.
+		:type path: str
+		"""
+
+		super(JSONStorage, self).__init__()
+		touch(path)  # Create file if not exists
+		self.kwargs = kwargs
+		self.path = path
+		self._handle = bz2.BZ2File(path, 'r')
+		self.close()
+
+	def read(self):
+		if os.path.getsize(self.path) == 0:
+			# File is empty
+			return None
+		else:
+			self._handle = bz2.BZ2File(self.path, 'r')
+			ret = json.load(self._handle)
+			self.close()
+			return ret
+
+	def write(self, data):
+		self._handle = bz2.BZ2File(self.path, 'w')
+		serialized = json.dumps(data, **self.kwargs)
+		self._handle.write(serialized)
+		self.close()
 
 
 class MemoryStorage(Storage):
