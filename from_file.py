@@ -12,6 +12,7 @@ from datetime import datetime
 # from measurements import energy
 # from measurements import si
 # from measurements import util
+from solar_circuit.libs.pyhighcharts import Chart, ChartTypes
 from solar_circuit.libs.tinydb import TinyDB
 from solar_circuit.libs.tinydb.storages import CompressedJSONStorage
 from solar_circuit.libs.tinydb.middlewares import CachingMiddleware
@@ -35,22 +36,27 @@ def ts_hours_ago(ts, hours):
 def main():
 	db = TinyDB("./databases/samples.json.bz2",
 				storage=CachingMiddleware(CompressedJSONStorage))
-	for t in db.tables():
+	chart = Chart(title={'text':"Power Measurements"},
+				  yAxis={'title': {'text': "Watts"}})
+	for t in [t for t in db.tables() if t != "_default"]:
 		Sample = Query()
 		power_samples = db.table(t).search(Sample.utc.test(ts_hours_ago, 24) &\
 										   (Sample.channel == "Power"))
-		series = ([], [])
+		series = [] # ([], [])
 		for p in power_samples:
-			ts = ts_to_dt(p['utc'])
+			ts = epoch_secs(ts_to_dt(p['utc']))
 			if p['value'] < 0:
 				print ts, p['value'], p['channel']
-			series[0].append(ts)
-			series[1].append(p['value'])
+			series.append((p['utc'], p['value']))
+			# series[1].append(p['value'])
 
-		pyplot.plot(*series)
+		chart.add_data_series(ChartTypes.spline, series, name=t, visible=False,
+							  marker={'enabled': False})
+		# pyplot.plot(*series)
 	db.close()
-	pyplot.legend(db.tables())
-	pyplot.show()
+	chart.show()
+	# pyplot.legend(db.tables())
+	# pyplot.show()
 	# f_str = open(sys.argv[1], 'rb').read()
 
 	# ts = timeseries.Timeseries.decompress(f_str)
