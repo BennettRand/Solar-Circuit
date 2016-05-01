@@ -92,7 +92,7 @@ class Shark100(ModbusTCPDevice):
 	def __init__(self, ip):
 		super(Shark100, self).__init__(ip)
 		self.registers = [(0x0000, 47),
-						  (0x0383, 6),
+						  # (0x0383, 6),
 						  (0x03E7, 30)]
 						  # (0x044B, 18),
 						  # (0x07CF, 20),
@@ -121,6 +121,25 @@ class Shark100(ModbusTCPDevice):
 			sample["VAR"] = formats.float32(regs[2:4])
 			sample["VA"] = formats.float32(regs[4:6])
 		elif addr == 0x03E7:
+			sample["VoltsAN"] = formats.float32(regs[0:2])
+			sample["VoltsBN"] = formats.float32(regs[2:4])
+			sample["VoltsCN"] = formats.float32(regs[4:6])
+			sample["VoltsAB"] = formats.float32(regs[6:8])
+			sample["VoltsBC"] = formats.float32(regs[8:10])
+			sample["VoltsCA"] = formats.float32(regs[10:12])
+			sample["AmpsA"] = formats.float32(regs[12:14])
+			sample["AmpsB"] = formats.float32(regs[14:16])
+			sample["AmpsC"] = formats.float32(regs[16:18])
+			sample["Power"] = formats.float32(regs[18:20])
+			sample["VAR"] = formats.float32(regs[20:22])
+			sample["VA"] = formats.float32(regs[22:24])
 			sample["PowerFactor"] = formats.float32(regs[24:26])
 			sample["Frequency"] = formats.float32(regs[26:28])
+			sample["AmpsN"] = formats.float32(regs[28:30])
+			pfc = sample["Power"] / sample["VA"]
+			pc = sample["VA"] * sample["PowerFactor"]
+			logging.info("PF error: %f",
+						 ((sample["PowerFactor"] - pfc) / pfc) * 100.0)
+			logging.info("Power error: %f",
+						 ((sample["Power"] - pc) / pc) * 100.0)
 		self.fire(store_sample(self.get_dev_id(), timestamp, sample))
