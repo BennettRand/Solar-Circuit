@@ -9,7 +9,7 @@ from circuits import Component, Event, Timer, Worker, task
 
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
 from solar_circuit.libs import prettytable
-from solar_circuit.utility.helpers import *
+from solar_circuit.utility.helpers import stringify_reg
 from solar_circuit.utility import formats
 from solar_circuit.sample_database import store_sample
 from . import sample, sample_success
