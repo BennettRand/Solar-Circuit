@@ -35,13 +35,14 @@ class WebUI(Controller):
 		return ret
 		
 	def graph(self, table, hours=24):
+		logging.info("Graphing %s from the last %s hours", table, hours)
 		Sample = Query()
 		table = get_database().table(table)
 		chart = Chart(title={'text':"Measurements"},
 				  yAxis={'title': {'text': 'Value'}},
 				  xAxis={'type': 'datetime'})
 		
-		samples = table.search(Sample.utc.test(ts_hours_ago, int(hours)))
+		samples = table.search(Sample.utc.test(ts_hours_ago, float(hours)))
 		samples.sort(key=lambda x: ts_to_dt(x['utc']))
 		
 		serieses = {}
@@ -55,12 +56,14 @@ class WebUI(Controller):
 		for s in serieses:
 			chart.add_data_series(ChartTypes.line, serieses[s], name=s, 
 								  visible=(s in self.DEFAULTS),
+								  animation=(s not in self.DEFAULTS),
 								  marker={'enabled': False})
 		
 		return SHOW_TEMPLATE.safe_substitute(container=chart.container,
 											  chart=chart.script())
 		
 	def exit(self):
+		logging.critical("Exit command recieved")
 		raise SystemExit(0)
 
 

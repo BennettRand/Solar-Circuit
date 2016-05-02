@@ -17,7 +17,7 @@ def ts_to_dt(ts):
 
 def ts_hours_ago(ts, hours):
 	now = time.mktime(time.gmtime())
-	ago = now - (hours * 60 * 60)
+	ago = now - (hours * 60.0 * 60.0)
 	epoch = epoch_secs(ts_to_dt(ts))
 	return ago < epoch
 	

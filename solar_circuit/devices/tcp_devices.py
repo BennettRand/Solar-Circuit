@@ -67,7 +67,7 @@ class ModbusTCPDevice(Component):
 		self.fire(task(self._sample), "sample_worker")
 
 	def _sample(self):
-		logging.info("Sampling from %s", self.sn)
+		logging.debug("Sampling from %s", self.sn)
 		start = time.time()
 		for t in self.registers:
 			try:

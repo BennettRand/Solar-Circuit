@@ -16,6 +16,7 @@ class DeviceManager(Component):
 		self.active = False
 		self.discovery_timer = None
 		self.sample_worker = None
+		self.discovery_worker = None
 
 	def discover(self):
 		logging.info("Discovery tick")
@@ -26,6 +27,7 @@ class DeviceManager(Component):
 		logging.info("Initializing discovery")
 		self.active = True
 		self.sample_worker = Worker(channel="sample_worker").register(self)
+		self.discovery_worker = Worker(workers=1, channel="discovery_worker").register(self)
 		self.discovery_timer = Timer(self.DISCOVERY_INTERVAL, discover(),
 									 persist=True).register(self)
 		self.fire(discover())
