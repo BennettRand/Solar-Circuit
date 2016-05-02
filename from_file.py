@@ -6,12 +6,6 @@ import time
 from matplotlib import pyplot
 from datetime import datetime
 
-# sys.path.append(r'C:\Users\brand\Measurements')
-
-# from measurements import timeseries
-# from measurements import energy
-# from measurements import si
-# from measurements import util
 from solar_circuit.libs.pyhighcharts import Chart, ChartTypes
 from solar_circuit.libs.tinydb import TinyDB
 from solar_circuit.libs.tinydb.storages import CompressedJSONStorage
@@ -43,18 +37,17 @@ def main():
 		Sample = Query()
 		power_samples = db.table(t).search(Sample.utc.test(ts_hours_ago, 24) &\
 										   (Sample.channel == "Power"))
-		series = [] # ([], [])
+		series = []
+		power_samples.sort(key=lambda x: ts_to_dt(x['utc']))
 		for p in power_samples:
 			ts = ts_to_dt(p['utc'])
 			if p['value'] < 0:
 				print ts, p['value'], p['channel']
 			else:
 				series.append((ts, p['value']))
-			# series[1].append(p['value'])
 
 		chart.add_data_series(ChartTypes.line, series, name=t, visible=False,
 							  marker={'enabled': False})
-		# pyplot.plot(*series)
 	db.close()
 	chart.show()
 

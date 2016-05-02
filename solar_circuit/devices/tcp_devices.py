@@ -9,7 +9,7 @@ from circuits import Component, Event, Timer, Worker, task
 
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
 from solar_circuit.libs import prettytable
-from solar_circuit.utility.helpers import stringify_reg
+from solar_circuit.utility.helpers import stringify_reg, power_error
 from solar_circuit.utility import formats
 from solar_circuit.sample_database import store_sample
 from . import sample, sample_success
@@ -89,10 +89,11 @@ class ModbusTCPDevice(Component):
 @register_device_type
 class Shark100(ModbusTCPDevice):
 	PREFIX = 'SHRK'
+	ERROR_LIMIT = 1.0
 	def __init__(self, ip):
 		super(Shark100, self).__init__(ip)
 		self.registers = [(0x0000, 47),
-						  # (0x0383, 6),
+						  (0x0383, 6),
 						  (0x03E7, 30)]
 						  # (0x044B, 18),
 						  # (0x07CF, 20),
@@ -103,7 +104,7 @@ class Shark100(ModbusTCPDevice):
 
 	def started(self, *args):
 		super(Shark100, self).started(args)
-		self.update_interval(30)
+		self.update_interval(5)
 
 	def sample_success(self, addr, regs):
 		sample = {}
@@ -117,9 +118,9 @@ class Shark100(ModbusTCPDevice):
 			# logging.info("Meter Configuration: %s", formats.bitfield(regs[20:21]))
 			# logging.info("ASIC Version: %s", formats.uint16(regs[21:22]))
 		elif addr == 0x0383:
-			sample["Power"] = formats.float32(regs[0:2])
-			sample["VAR"] = formats.float32(regs[2:4])
-			sample["VA"] = formats.float32(regs[4:6])
+			sample["PowerFast"] = formats.float32(regs[0:2])
+			sample["VARFast"] = formats.float32(regs[2:4])
+			sample["VAFast"] = formats.float32(regs[4:6])
 		elif addr == 0x03E7:
 			sample["VoltsAN"] = formats.float32(regs[0:2])
 			sample["VoltsBN"] = formats.float32(regs[2:4])
@@ -136,10 +137,9 @@ class Shark100(ModbusTCPDevice):
 			sample["PowerFactor"] = formats.float32(regs[24:26])
 			sample["Frequency"] = formats.float32(regs[26:28])
 			sample["AmpsN"] = formats.float32(regs[28:30])
-			pfc = sample["Power"] / sample["VA"]
-			pc = sample["VA"] * sample["PowerFactor"]
-			logging.info("PF error: %f",
-						 ((sample["PowerFactor"] - pfc) / pfc) * 100.0)
-			logging.info("Power error: %f",
-						 ((sample["Power"] - pc) / pc) * 100.0)
+			error = power_error(sample["Power"], sample["VA"], sample["PowerFactor"])
+			if error > self.ERROR_LIMIT:
+				logging.error("%s error too high: %f", self.get_dev_id(), error)
+				return
+			
 		self.fire(store_sample(self.get_dev_id(), timestamp, sample))
