@@ -34,6 +34,8 @@ class ModbusTCPDevice(Component):
 		self.registers = []
 		self.conn = None
 		self._set_channel()
+		self.queued_time = time.time()
+		self.time_d = 0
 
 	def _set_channel(self):
 		self.channel = self.__class__.__name__ + str(id(self))
@@ -64,6 +66,7 @@ class ModbusTCPDevice(Component):
 
 	def sample(self):
 		logging.debug("%s Spawning sample task", self.sn)
+		self.queued_time = time.time()
 		self.fire(task(self._sample), "sample_worker")
 
 	def _sample(self):
@@ -79,8 +82,10 @@ class ModbusTCPDevice(Component):
 					logging.warn("%s sent empty sample", self.sn)
 				else:
 					self.fire(sample_success(t[0], regs), self)
-		time_d = time.time() - start
-		logging.debug("Sampling %s took %s", self.sn, time_d)
+		self.time_d = time.time() - self.queued_time
+		logging.debug("Sampling %s took %s", self.sn, self.time_d)
+		if self.time_d > self.sample_timer.interval:
+			logging.warn("Sampling %s took %s! (> %s)", self.sn, self.time_d, self.sample_timer.interval)
 		return
 
 	def get_dev_id(self):
