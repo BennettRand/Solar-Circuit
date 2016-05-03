@@ -13,7 +13,7 @@ from solar_circuit.libs.pyhighcharts import Chart, ChartTypes
 from solar_circuit.libs.pyhighcharts.chart import SHOW_TEMPLATE
 from solar_circuit.libs.tinydb import Query
 from solar_circuit.sample_database import get_database
-from solar_circuit.utility.helpers import ts_hours_ago, ts_to_dt
+from solar_circuit.utility.helpers import ts_hours_ago, ts_to_dt, str_to_color
 
 
 class do_exit(Event):
@@ -73,7 +73,8 @@ class WebUI(Controller):
 			chart.add_data_series(ChartTypes.line, serieses[s], name=s,
 								  visible=(s in self.DEFAULTS),
 								  animation=(s not in self.DEFAULTS),
-								  marker={'enabled': False})
+								  marker={'enabled': False},
+								  color=str_to_color(s))
 
 		return SHOW_TEMPLATE.safe_substitute(container=chart.container,
 											  chart=chart.script())
@@ -100,7 +101,8 @@ class WebUI(Controller):
 			chart.add_data_series(ChartTypes.line, serieses[s], name=s,
 								  visible=(s in self.DEFAULTS),
 								  animation=(s not in self.DEFAULTS),
-								  marker={'enabled': False})
+								  marker={'enabled': False},
+								  color=str_to_color(s))
 
 		return SHOW_TEMPLATE.safe_substitute(container=chart.container,
 											  chart=chart.script())
