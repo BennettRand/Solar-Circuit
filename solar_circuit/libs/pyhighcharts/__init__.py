@@ -13,6 +13,6 @@ __author__  = "Fin"
 # Third Party Imports
 
 # pyhighcharts Imports
-from chart import *
-from maps import *
-from util import JS_TYPE
+from .chart import *
+from .maps import *
+from .util import JS_TYPE

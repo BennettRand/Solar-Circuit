@@ -75,7 +75,7 @@ def format_options(data):
 # Custom Formatters
 FORMATTERS = {
     bool: lambda v: "true" if v else "false",
-    NoneType: lambda _: "null",
+    type(None): lambda _: "null",
     datetime: lambda d: "Date.UTC({}, {}, {}, {}, {}, {})".format(d.year, (d.month - 1), d.day, d.hour, d.minute, d.second),
     JS_TYPE: lambda js: js.raw
 }

@@ -9,7 +9,7 @@ __author__  = "Fin"
 # Stdlib Imports
 
 # Third Party Imports
-from util import dict_to_js
+from .util import dict_to_js
 
 
 class Formatter:

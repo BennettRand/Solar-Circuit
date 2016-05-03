@@ -19,7 +19,7 @@ import copy
 # Third Party Imports
 
 # pyhighcharts Imports
-from util import safe_update, format_script_tag, \
+from .util import safe_update, format_script_tag, \
     format_options, JS_TYPE
 
 

@@ -37,7 +37,7 @@ DELETE_TEMPLATE = """DELETE FROM samples
 WHERE utc < datetime('now', '-{} hours')"""
 
 class SampleDatabase(Component):
-	DB_PATH = os.path.join(os.getcwd(), r"databases\samples.db")
+	DB_PATH = os.path.join(os.getcwd(), r"databases/samples.db")
 	def __init__(self):
 		global DATABASE
 		super(SampleDatabase, self).__init__()

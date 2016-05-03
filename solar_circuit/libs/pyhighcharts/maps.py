@@ -15,8 +15,8 @@ import webbrowser
 # Third Party Imports
 
 # DSP Imports
-from util import format_map_tag, format_options, safe_update
-from chart import Chart
+from .util import format_map_tag, format_options, safe_update
+from .chart import Chart
 
 SHOW_TEMPLATE = """<html>
 <head>
@@ -75,7 +75,7 @@ class Map(Chart):
             "enableMouseTracking": False
         }
         defaults.update(options)
-        print self.series
+        # print self.series
         if len(self.series) > 0:
             self.series.insert(1, defaults)
 
