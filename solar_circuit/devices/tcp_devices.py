@@ -82,7 +82,7 @@ class ModbusTCPDevice(Component):
 		time_d = time.time() - start
 		logging.debug("Sampling %s took %s", self.sn, time_d)
 		return
-		
+
 	def get_dev_id(self):
 		return "{}-{}".format(self.PREFIX, self.sn)
 
@@ -108,7 +108,7 @@ class Shark100(ModbusTCPDevice):
 
 	def sample_success(self, addr, regs):
 		sample = {}
-		timestamp = datetime.datetime.utcnow().isoformat() + "Z"
+		timestamp = datetime.datetime.utcnow()
 		if addr == 0x0000:
 			# logging.info("Name: %s", formats.modbus_string(regs[0:8]))
 			self.sn = formats.modbus_string(regs[8:16]).strip(" ")
@@ -141,5 +141,5 @@ class Shark100(ModbusTCPDevice):
 			if error > self.ERROR_LIMIT:
 				logging.error("%s error too high: %f", self.get_dev_id(), error)
 				return
-			
+
 		self.fire(store_sample(self.get_dev_id(), timestamp, sample))
