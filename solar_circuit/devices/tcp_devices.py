@@ -167,6 +167,10 @@ class SEL735(ModbusTCPDevice):
 						  (0x0384, 26),
 						  (0x0258, 58)]
 
+	def started(self, *args):
+		super(SEL735, self).started(args)
+		self.update_interval(60)
+
 	def sample_success(self, addr, regs):
 		sample = {}
 		timestamp = datetime.datetime.utcnow()
