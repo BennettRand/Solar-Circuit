@@ -171,7 +171,7 @@ class SEL735(ModbusTCPDevice):
 		sample = {}
 		timestamp = datetime.datetime.utcnow()
 		if addr == 0x0014:
-			self.sn = formats.modbus_string(regs).strip(" ").strip("\x0")
+			self.sn = formats.modbus_string(regs).strip(" ").strip("\x00")
 		elif addr == 0x015E:
 			sample["AmpsA"] = float(formats.int32(regs[0:2])) / 100.0
 			sample["AmpsB"] = float(formats.int32(regs[2:4])) / 100.0
