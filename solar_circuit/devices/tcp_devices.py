@@ -36,6 +36,7 @@ class ModbusTCPDevice(Component):
 		self._set_channel()
 		self.queued_time = time.time()
 		self.time_d = 0
+		self.sample_pending = False
 
 	def _set_channel(self):
 		self.channel = self.__class__.__name__ + str(id(self))
@@ -65,9 +66,13 @@ class ModbusTCPDevice(Component):
 		logging.debug("Sample from %s address %s:\n%s", addr, self.sn, tab.get_string())
 
 	def sample(self):
-		logging.debug("%s Spawning sample task", self.sn)
-		self.queued_time = time.time()
-		self.fire(task(self._sample), "sample_worker")
+		if self.sample_pending:
+			logging.warn("%s already has a sample pending.", self.get_dev_id())
+		else:
+			logging.debug("%s Spawning sample task", self.sn)
+			self.queued_time = time.time()
+			self.sample_pending = True
+			self.fire(task(self._sample), "sample_worker")
 
 	def _sample(self):
 		logging.debug("Sampling from %s", self.sn)
@@ -79,13 +84,15 @@ class ModbusTCPDevice(Component):
 				logging.error(e)
 			else:
 				if regs is None:
-					logging.warn("%s sent empty sample", self.sn)
+					logging.warn("%s sent empty sample", self.get_dev_id())
 				else:
 					self.fire(sample_success(t[0], regs), self)
 		self.time_d = time.time() - self.queued_time
-		logging.debug("Sampling %s took %s", self.sn, self.time_d)
+		logging.debug("Sampling %s took %s", self.get_dev_id(), self.time_d)
+		self.sample_pending = False
 		if self.time_d > self.sample_timer.interval:
-			logging.warn("Sampling %s took %s! (> %s)", self.sn, self.time_d, self.sample_timer.interval)
+			logging.warn("Sampling %s took %s! (> %s)", self.get_dev_id(),
+						 self.time_d, self.sample_timer.interval)
 		return
 
 	def get_dev_id(self):
@@ -146,5 +153,43 @@ class Shark100(ModbusTCPDevice):
 			if error > self.ERROR_LIMIT:
 				logging.error("%s error too high: %f", self.get_dev_id(), error)
 				return
+
+		self.fire(store_sample(self.get_dev_id(), timestamp, sample))
+
+@register_device_type
+class SEL735(ModbusTCPDevice):
+	PREFIX = 'SEL'
+	ERROR_LIMIT = 1.0
+	def __init__(self, ip):
+		super(SEL735, self).__init__(ip)
+		self.registers = [(0x0014, 20),
+						  (0x015E, 32),
+						  (0x0384, 26),
+						  (0x0258, 58)]
+
+	def sample_success(self, addr, regs):
+		sample = {}
+		timestamp = datetime.datetime.utcnow()
+		if addr == 0x0014:
+			self.sn = formats.modbus_string(regs).strip(" ").strip("\x0")
+		elif addr == 0x015E:
+			sample["AmpsA"] = float(formats.int32(regs[0:2])) / 100.0
+			sample["AmpsB"] = float(formats.int32(regs[2:4])) / 100.0
+			sample["AmpsC"] = float(formats.int32(regs[4:6])) / 100.0
+			sample["AmpsN"] = float(formats.int32(regs[6:8])) / 100.0
+			sample["VoltsA"] = float(formats.int32(regs[8:10])) / 100.0
+			sample["VoltsB"] = float(formats.int32(regs[10:12])) / 100.0
+			sample["VoltsC"] = float(formats.int32(regs[12:14])) / 100.0
+			sample["VoltsAB"] = float(formats.int32(regs[14:16])) / 100.0
+			sample["VoltsBC"] = float(formats.int32(regs[16:18])) / 100.0
+			sample["VoltsCA"] = float(formats.int32(regs[18:20])) / 100.0
+			sample["Power"] = float(formats.int32(regs[20:22])) / 100.0
+			sample["VA"] = float(formats.int32(regs[22:24])) / 100.0
+			sample["VAR"] = float(formats.int32(regs[24:26])) / 100.0
+			sample["PowerA"] = float(formats.int32(regs[26:28])) / 100.0
+			sample["PowerB"] = float(formats.int32(regs[28:30])) / 100.0
+			sample["PowerC"] = float(formats.int32(regs[30:32])) / 100.0
+		elif addr == 0x0258:
+			sample["TotalImport"] = formats.int32(regs[0:2])
 
 		self.fire(store_sample(self.get_dev_id(), timestamp, sample))
