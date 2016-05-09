@@ -1,0 +1,11 @@
+address,registers,format,name,store
+0x0,8,modbus_string,Name,2
+0x8,8,modbus_string,SerialNumber,2
+0x10,1,bitfield,MeterType,2
+0x11,2,modbus_string,FirmwareVersion,2
+0x13,1,uint16,MapVersion,2
+0x14,1,bitfield,MeterConfiguration,2
+0x15,1,uint16,ASICVersion,2
+0x383,2,float32,PowerFast,3
+0x385,2,float32,VARFast,3
+0x387,2,float32,VAFast,3

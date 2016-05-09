@@ -5,6 +5,7 @@ import struct
 import codecs
 import random
 import datetime
+import csv
 from circuits import Component, Event, Timer, Worker, task
 
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
@@ -97,6 +98,24 @@ class ModbusTCPDevice(Component):
 
 	def get_dev_id(self):
 		return "{}-{}".format(self.PREFIX, self.sn)
+
+class ModbusTCPCSVMapDevice(ModbusTCPDevice):
+	def __init__(self, ip):
+		super(ModbusTCPCSVMapDevice, self).__init__()
+		self.map = {}
+	def _load_csv_map(self, fname):
+		with open(fname, 'r') as f:
+			reader = csv.DictReader(f)
+			for row in reader:
+				if row['address'].startswith('0x'):
+					base = 16
+				else:
+					base = 10
+				address = int(row['address'], base)
+				self.map[address] = row
+				self.registers.append()
+			
+		
 
 @register_device_type
 class Shark100(ModbusTCPDevice):
