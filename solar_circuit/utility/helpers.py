@@ -40,3 +40,29 @@ def str_to_color(str_):
 	hexstr = m.hexdigest()[:6].upper()
 	hexstr = [hex((int(x,16) + 0x8) // 2)[2:] for x in hexstr]
 	return "#" + "".join(hexstr)
+
+
+def minimize_addresses(registers):
+	min_addrs = []
+	min_sizes = []
+
+	next_addr = None
+	running_len = 0
+	for a,s in registers:
+	    if next_addr is None:
+	        next_addr = a + s
+	        running_len = s
+	    else:
+	        if a == next_addr:
+	            next_addr += s
+	            running_len += s
+	        else:
+	            min_addrs.append(next_addr - running_len)
+	            min_sizes.append(running_len)
+	            running_len = s
+	            next_addr = a + s
+
+	min_addrs.append(next_addr - running_len)
+	min_sizes.append(running_len)
+
+	return zip(min_addrs, min_sizes)

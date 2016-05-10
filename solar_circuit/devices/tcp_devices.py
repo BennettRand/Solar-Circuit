@@ -6,11 +6,12 @@ import codecs
 import random
 import datetime
 import csv
+import base64
 from circuits import Component, Event, Timer, Worker, task
 
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
 from solar_circuit.libs import prettytable
-from solar_circuit.utility.helpers import stringify_reg, power_error
+from solar_circuit.utility.helpers import stringify_reg, power_error, minimize_addresses
 from solar_circuit.utility import formats
 from solar_circuit.sample_database import store_sample
 from . import sample, sample_success
@@ -101,8 +102,11 @@ class ModbusTCPDevice(Component):
 
 class ModbusTCPCSVMapDevice(ModbusTCPDevice):
 	def __init__(self, ip):
-		super(ModbusTCPCSVMapDevice, self).__init__()
+		super(ModbusTCPCSVMapDevice, self).__init__(ip)
 		self.map = {}
+		self.order = 1
+		self.latest_sample = {}
+		self.latest_sample_time = None
 	def _load_csv_map(self, fname):
 		with open(fname, 'r') as f:
 			reader = csv.DictReader(f)
@@ -112,68 +116,72 @@ class ModbusTCPCSVMapDevice(ModbusTCPDevice):
 				else:
 					base = 10
 				address = int(row['address'], base)
-				self.map[address] = row
-				self.registers.append()
-			
-		
+				registers = int(row['registers'])
+				reg_format = getattr(formats, row['format'], lambda x,o: x[::o])
+				self.map[address] = {'address': address,
+									 'registers': registers,
+									 'format': reg_format,
+									 'name': row['name'],
+									 'store': row['store']}
+				self.registers.append((address, registers))
+		self.registers = minimize_addresses(self.registers)
+		logging.debug("%s will sample: %s", self.get_dev_id(), self.registers)
+
+	def sample_success(self, addr, regs):
+		query_frame = (259,) + (addr, len(regs))
+		logging.info(stringify_reg())
+
+
 
 @register_device_type
-class Shark100(ModbusTCPDevice):
+class Shark100(ModbusTCPCSVMapDevice):
 	PREFIX = 'SHRK'
 	ERROR_LIMIT = 1.0
 	def __init__(self, ip):
 		super(Shark100, self).__init__(ip)
-		self.registers = [(0x0000, 47),
-						  (0x0383, 6),
-						  (0x03E7, 30)]
-						  # (0x044B, 18),
-						  # (0x07CF, 20),
-						  # (0x0BB7, 34),
-						  # (0x0C1B, 34),
-						  # (0x1003, 6),
-						  # (0x1387, 4)]
+		self._load_csv_map(r".\solar_circuit\configuration\shark100_modbus_registers.csv")
 
 	def started(self, *args):
 		super(Shark100, self).started(args)
-		self.update_interval(5)
+		self.update_interval(30)
 
-	def sample_success(self, addr, regs):
-		sample = {}
-		timestamp = datetime.datetime.utcnow()
-		if addr == 0x0000:
-			# logging.info("Name: %s", formats.modbus_string(regs[0:8]))
-			self.sn = formats.modbus_string(regs[8:16]).strip(" ")
-			# logging.info("Type: %s", formats.bitfield(regs[16:17]))
-			# logging.info("Firmware: %s", formats.modbus_string(regs[17:19]))
-			# logging.info("Map Version: %s", formats.uint16(regs[19:20]))
-			# logging.info("Meter Configuration: %s", formats.bitfield(regs[20:21]))
-			# logging.info("ASIC Version: %s", formats.uint16(regs[21:22]))
-		elif addr == 0x0383:
-			sample["PowerFast"] = formats.float32(regs[0:2])
-			sample["VARFast"] = formats.float32(regs[2:4])
-			sample["VAFast"] = formats.float32(regs[4:6])
-		elif addr == 0x03E7:
-			sample["VoltsAN"] = formats.float32(regs[0:2])
-			sample["VoltsBN"] = formats.float32(regs[2:4])
-			sample["VoltsCN"] = formats.float32(regs[4:6])
-			sample["VoltsAB"] = formats.float32(regs[6:8])
-			sample["VoltsBC"] = formats.float32(regs[8:10])
-			sample["VoltsCA"] = formats.float32(regs[10:12])
-			sample["AmpsA"] = formats.float32(regs[12:14])
-			sample["AmpsB"] = formats.float32(regs[14:16])
-			sample["AmpsC"] = formats.float32(regs[16:18])
-			sample["Power"] = formats.float32(regs[18:20])
-			sample["VAR"] = formats.float32(regs[20:22])
-			sample["VA"] = formats.float32(regs[22:24])
-			sample["PowerFactor"] = formats.float32(regs[24:26])
-			sample["Frequency"] = formats.float32(regs[26:28])
-			sample["AmpsN"] = formats.float32(regs[28:30])
-			error = power_error(sample["Power"], sample["VA"], sample["PowerFactor"])
-			if error > self.ERROR_LIMIT:
-				logging.error("%s error too high: %f", self.get_dev_id(), error)
-				return
-
-		self.fire(store_sample(self.get_dev_id(), timestamp, sample))
+	# def sample_success(self, addr, regs):
+	# 	sample = {}
+	# 	timestamp = datetime.datetime.utcnow()
+	# 	if addr == 0x0000:
+	# 		# logging.info("Name: %s", formats.modbus_string(regs[0:8]))
+	# 		self.sn = formats.modbus_string(regs[8:16]).strip(" ")
+	# 		# logging.info("Type: %s", formats.bitfield(regs[16:17]))
+	# 		# logging.info("Firmware: %s", formats.modbus_string(regs[17:19]))
+	# 		# logging.info("Map Version: %s", formats.uint16(regs[19:20]))
+	# 		# logging.info("Meter Configuration: %s", formats.bitfield(regs[20:21]))
+	# 		# logging.info("ASIC Version: %s", formats.uint16(regs[21:22]))
+	# 	elif addr == 0x0383:
+	# 		sample["PowerFast"] = formats.float32(regs[0:2])
+	# 		sample["VARFast"] = formats.float32(regs[2:4])
+	# 		sample["VAFast"] = formats.float32(regs[4:6])
+	# 	elif addr == 0x03E7:
+	# 		sample["VoltsAN"] = formats.float32(regs[0:2])
+	# 		sample["VoltsBN"] = formats.float32(regs[2:4])
+	# 		sample["VoltsCN"] = formats.float32(regs[4:6])
+	# 		sample["VoltsAB"] = formats.float32(regs[6:8])
+	# 		sample["VoltsBC"] = formats.float32(regs[8:10])
+	# 		sample["VoltsCA"] = formats.float32(regs[10:12])
+	# 		sample["AmpsA"] = formats.float32(regs[12:14])
+	# 		sample["AmpsB"] = formats.float32(regs[14:16])
+	# 		sample["AmpsC"] = formats.float32(regs[16:18])
+	# 		sample["Power"] = formats.float32(regs[18:20])
+	# 		sample["VAR"] = formats.float32(regs[20:22])
+	# 		sample["VA"] = formats.float32(regs[22:24])
+	# 		sample["PowerFactor"] = formats.float32(regs[24:26])
+	# 		sample["Frequency"] = formats.float32(regs[26:28])
+	# 		sample["AmpsN"] = formats.float32(regs[28:30])
+	# 		error = power_error(sample["Power"], sample["VA"], sample["PowerFactor"])
+	# 		if error > self.ERROR_LIMIT:
+	# 			logging.error("%s error too high: %f", self.get_dev_id(), error)
+	# 			return
+	#
+	# 	self.fire(store_sample(self.get_dev_id(), timestamp, sample))
 
 @register_device_type
 class SEL735(ModbusTCPDevice):
