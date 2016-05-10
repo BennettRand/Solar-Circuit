@@ -21,7 +21,7 @@ class ModbusTCPHandler(Component):
 		self.found_ips = set()
 		self.ip_scan_list = set()
 		self.devices = []
-	
+
 	def _load_tcp_list(self, fn):
 		ip_set = set()
 		logging.debug("Loading tcp scan list from %s", fn)
@@ -29,7 +29,7 @@ class ModbusTCPHandler(Component):
 			for ip in f.readlines():
 				ip_set.add(ip.rstrip("\n\r"))
 		self.ip_scan_list |= ip_set
-	
+
 	def _get_ip_scan_list(self):
 		return self.ip_scan_list - self.found_ips
 
@@ -38,7 +38,7 @@ class ModbusTCPHandler(Component):
 			d = csv.DictReader(f)
 			ret = [r for r in d]
 			return ret
-		
+
 	def started(self, *args):
 		logging.info("ModbusTCPHandler started")
 		self._load_tcp_list(self.TCP_LIST_PATH)
@@ -47,7 +47,7 @@ class ModbusTCPHandler(Component):
 		logging.info("Discovering ModbusTCP devices.")
 		for ip in self._get_ip_scan_list():
 			self.fire(task(self._discover, ip), "discovery_worker")
-			
+
 	def _discover(self, ip):
 		logging.info("Discovering %s", ip)
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -67,9 +67,11 @@ class ModbusTCPHandler(Component):
 				logging.debug("Is %s in %s", rule['expected'], stringify_reg(regs))
 				if rule['expected'].upper() in stringify_reg(regs).upper():
 					logging.info("%s is of type %s", ip, rule['dev_name'])
-					d = tcp_devices.TCP_DEV_NAMES[rule['dev_name']](ip)
-					d.started()
-					d.register(self) # Be sure to register _after_ running
-					self.devices.append(d)
+					try:
+						d = tcp_devices.TCP_DEV_NAMES[rule['dev_name']](ip)
+						d.started()
+						d.register(self) # Be sure to register _after_ running
+						self.devices.append(d)
+					except Exception as e:
+						logging.exception("Error during device creation: %s", e)
 			self.found_ips.add(ip)
-			
