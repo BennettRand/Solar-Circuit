@@ -121,6 +121,7 @@ class ModbusTCPCSVMapDevice(ModbusTCPDevice):
 									 'registers': registers,
 									 'format': reg_format,
 									 'name': row['name'],
+									 'scale': float(row['scale']),
 									 'store': int(row['store'])}
 				self.registers.append((address, registers))
 		self.registers = minimize_addresses(self.registers)
@@ -139,6 +140,10 @@ class ModbusTCPCSVMapDevice(ModbusTCPDevice):
 				if a in self.map:
 					relevent = [self.latest_sample[_] for _ in xrange(a, a + self.map[a]['registers'])]
 					parsed[self.map[a]['name']] = self.map[a]['format'](tuple(relevent), self.order)
+					try:
+						parsed[self.map[a]['name']] /= self.map[a]['scale']
+					except TypeError:
+						pass
 
 					keep_pair |= bool(self.map[a]['store'] & STORE_COMMAND)
 
@@ -169,7 +174,7 @@ class Shark100(ModbusTCPCSVMapDevice):
 
 	def sample_success(self, addr, regs):
 		super(Shark100, self).sample_success(addr, regs)
-		self.sn = self.latest_sample['SerialNumber']
+		self.sn = self.latest_sample['SerialNumber'].strip(' ')
 
 @register_device_type
 class SEL735(ModbusTCPDevice):

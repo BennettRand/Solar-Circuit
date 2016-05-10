@@ -54,13 +54,16 @@ class SampleDatabase(Component):
 		self.clear_timer = Timer(60, clear_old(), self, persist=True).register(self)
 
 	def store_sample(self, dev_id, utctime, sample_dict):
-		rows = []
+		try:
+			rows = []
 
-		for k in sample_dict:
-			rows.append((dev_id, utctime, k, sample_dict[k]))
+			for k in sample_dict:
+				rows.append((dev_id, utctime, k, sample_dict[k]))
 
-		DATABASE.cursor().executemany(INSERT_TEMPLATE, rows)
-		DATABASE.commit()
+			DATABASE.cursor().executemany(INSERT_TEMPLATE, rows)
+			DATABASE.commit()
+		except Exception as e:
+			logging.exception("RT Sample Store Error: %s, %s", e, sample_dict)
 
 	def clear_old(self, hours=24):
 		if DATABASE is None:
