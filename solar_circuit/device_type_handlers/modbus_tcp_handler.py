@@ -1,14 +1,13 @@
 import logging
-import time
 import socket
 import csv
 import os
 import os.path
-from circuits import Component, Event, task
+from circuits import Component, task
 
 from solar_circuit.devices import tcp_devices
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
-from solar_circuit.utility.helpers import *
+from solar_circuit.utility.helpers import stringify_reg
 
 class ModbusTCPHandler(Component):
 	MODBUS_PORT = 502
@@ -27,7 +26,8 @@ class ModbusTCPHandler(Component):
 		logging.debug("Loading tcp scan list from %s", fn)
 		with open(fn, 'r') as f:
 			for ip in f.readlines():
-				ip_set.add(ip.rstrip("\n\r"))
+				if not ip.startswith("#"):
+					ip_set.add(ip.rstrip("\n\r"))
 		self.ip_scan_list |= ip_set
 
 	def _get_ip_scan_list(self):
