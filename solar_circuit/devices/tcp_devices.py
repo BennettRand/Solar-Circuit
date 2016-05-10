@@ -1,22 +1,22 @@
 import logging
 import time
-import socket
-import struct
-import codecs
 import random
 import datetime
 import csv
 import base64
-from circuits import Component, Event, Timer, Worker, task
+from circuits import Component, Timer, task
 
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
 from solar_circuit.libs import prettytable
-from solar_circuit.utility.helpers import stringify_reg, power_error, minimize_addresses
+from solar_circuit.utility.helpers import stringify_reg, power_error, minimize_addresses, make_rtu_pair
 from solar_circuit.utility import formats
 from solar_circuit.sample_database import store_sample
 from . import sample, sample_success
 
-TCP_DEV_NAMES ={}
+TCP_DEV_NAMES = {}
+
+STORE_COMMAND = 0b10
+STORE_RT = 0b01
 
 def register_device_type(cls):
 	global TCP_DEV_NAMES
@@ -53,7 +53,7 @@ class ModbusTCPDevice(Component):
 
 	def update_interval(self, interval, stray=1):
 		if self.sample_timer is not None:
-			self.sample_timer.reset(interval + random.uniform(0,stray))
+			self.sample_timer.reset(interval + random.uniform(0, stray))
 			return True
 		return False
 
@@ -78,7 +78,6 @@ class ModbusTCPDevice(Component):
 
 	def _sample(self):
 		logging.debug("Sampling from %s", self.sn)
-		start = time.time()
 		for t in self.registers:
 			try:
 				regs = self.conn.read_holding_registers(t[0], t[1])
@@ -117,19 +116,42 @@ class ModbusTCPCSVMapDevice(ModbusTCPDevice):
 					base = 10
 				address = int(row['address'], base)
 				registers = int(row['registers'])
-				reg_format = getattr(formats, row['format'], lambda x,o: x[::o])
+				reg_format = getattr(formats, row['format'], lambda x, o: x[::o])
 				self.map[address] = {'address': address,
 									 'registers': registers,
 									 'format': reg_format,
 									 'name': row['name'],
-									 'store': row['store']}
+									 'store': int(row['store'])}
 				self.registers.append((address, registers))
 		self.registers = minimize_addresses(self.registers)
 		logging.debug("%s will sample: %s", self.get_dev_id(), self.registers)
 
 	def sample_success(self, addr, regs):
-		query_frame = (259,) + (addr, len(regs))
-		logging.info(stringify_reg())
+		try:
+			self.latest_sample.update({a: r for a, r in zip(xrange(addr, addr + len(regs)), regs)})
+			self.latest_sample_time = datetime.datetime.utcnow()
+			rtu_pair = make_rtu_pair(1, addr, regs)
+			parsed = {}
+			rt = {}
+			keep_pair = False
+
+			for a in self.latest_sample:
+				if a in self.map:
+					relevent = [self.latest_sample[_] for _ in xrange(a, a + self.map[a]['registers'])]
+					parsed[self.map[a]['name']] = self.map[a]['format'](tuple(relevent), self.order)
+
+					keep_pair |= bool(self.map[a]['store'] & STORE_COMMAND)
+
+					if self.map[a]['store'] & STORE_RT:
+						rt[self.map[a]['name']] = parsed[self.map[a]['name']]
+
+			self.latest_sample.update(parsed)
+
+			if rt:
+				self.fire(store_sample(self.get_dev_id(), self.latest_sample_time, rt))
+
+		except Exception as e:
+			logging.exception("Parsing failure: %s", e)
 
 
 
@@ -143,45 +165,11 @@ class Shark100(ModbusTCPCSVMapDevice):
 
 	def started(self, *args):
 		super(Shark100, self).started(args)
-		self.update_interval(30)
+		self.update_interval(10)
 
-	# def sample_success(self, addr, regs):
-	# 	sample = {}
-	# 	timestamp = datetime.datetime.utcnow()
-	# 	if addr == 0x0000:
-	# 		# logging.info("Name: %s", formats.modbus_string(regs[0:8]))
-	# 		self.sn = formats.modbus_string(regs[8:16]).strip(" ")
-	# 		# logging.info("Type: %s", formats.bitfield(regs[16:17]))
-	# 		# logging.info("Firmware: %s", formats.modbus_string(regs[17:19]))
-	# 		# logging.info("Map Version: %s", formats.uint16(regs[19:20]))
-	# 		# logging.info("Meter Configuration: %s", formats.bitfield(regs[20:21]))
-	# 		# logging.info("ASIC Version: %s", formats.uint16(regs[21:22]))
-	# 	elif addr == 0x0383:
-	# 		sample["PowerFast"] = formats.float32(regs[0:2])
-	# 		sample["VARFast"] = formats.float32(regs[2:4])
-	# 		sample["VAFast"] = formats.float32(regs[4:6])
-	# 	elif addr == 0x03E7:
-	# 		sample["VoltsAN"] = formats.float32(regs[0:2])
-	# 		sample["VoltsBN"] = formats.float32(regs[2:4])
-	# 		sample["VoltsCN"] = formats.float32(regs[4:6])
-	# 		sample["VoltsAB"] = formats.float32(regs[6:8])
-	# 		sample["VoltsBC"] = formats.float32(regs[8:10])
-	# 		sample["VoltsCA"] = formats.float32(regs[10:12])
-	# 		sample["AmpsA"] = formats.float32(regs[12:14])
-	# 		sample["AmpsB"] = formats.float32(regs[14:16])
-	# 		sample["AmpsC"] = formats.float32(regs[16:18])
-	# 		sample["Power"] = formats.float32(regs[18:20])
-	# 		sample["VAR"] = formats.float32(regs[20:22])
-	# 		sample["VA"] = formats.float32(regs[22:24])
-	# 		sample["PowerFactor"] = formats.float32(regs[24:26])
-	# 		sample["Frequency"] = formats.float32(regs[26:28])
-	# 		sample["AmpsN"] = formats.float32(regs[28:30])
-	# 		error = power_error(sample["Power"], sample["VA"], sample["PowerFactor"])
-	# 		if error > self.ERROR_LIMIT:
-	# 			logging.error("%s error too high: %f", self.get_dev_id(), error)
-	# 			return
-	#
-	# 	self.fire(store_sample(self.get_dev_id(), timestamp, sample))
+	def sample_success(self, addr, regs):
+		super(Shark100, self).sample_success(addr, regs)
+		self.sn = self.latest_sample['SerialNumber']
 
 @register_device_type
 class SEL735(ModbusTCPDevice):
