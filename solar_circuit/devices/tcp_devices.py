@@ -127,38 +127,24 @@ class ModbusTCPCSVMapDevice(ModbusTCPDevice):
 		self.registers = minimize_addresses(self.registers)
 		logging.debug("%s will sample: %s", self.get_dev_id(), self.registers)
 
+	def _parse_from_map(self, addr, regs):
+		new_sample = {a: r for a, r in zip(xrange(addr, addr + len(regs)), regs)}
+		parsed = {}
+
+		for a in new_sample:
+			if a in self.map:
+				relevent = [new_sample[_] for _ in xrange(a, a + self.map[a]['registers'])]
+				parsed[self.map[a]['name']] = self.map[a]['format'](tuple(relevent), self.order)
+				try:
+					parsed[self.map[a]['name']] /= self.map[a]['scale']
+				except TypeError:
+					pass
+
+		new_sample.update(parsed)
+		return new_sample
+
 	def sample_success(self, addr, regs):
-		try:
-			self.latest_sample.update({a: r for a, r in zip(xrange(addr, addr + len(regs)), regs)})
-			self.latest_sample_time = datetime.datetime.utcnow()
-			rtu_pair = make_rtu_pair(1, addr, regs)
-			parsed = {}
-			rt = {}
-			keep_pair = False
-
-			for a in self.latest_sample:
-				if a in self.map:
-					relevent = [self.latest_sample[_] for _ in xrange(a, a + self.map[a]['registers'])]
-					parsed[self.map[a]['name']] = self.map[a]['format'](tuple(relevent), self.order)
-					try:
-						parsed[self.map[a]['name']] /= self.map[a]['scale']
-					except TypeError:
-						pass
-
-					keep_pair |= bool(self.map[a]['store'] & STORE_COMMAND)
-
-					if self.map[a]['store'] & STORE_RT:
-						rt[self.map[a]['name']] = parsed[self.map[a]['name']]
-
-			self.latest_sample.update(parsed)
-
-			if rt:
-				self.fire(store_sample(self.get_dev_id(), self.latest_sample_time, rt))
-
-		except Exception as e:
-			logging.exception("Parsing failure: %s", e)
-
-
+		pass
 
 @register_device_type
 class Shark100(ModbusTCPCSVMapDevice):
@@ -173,8 +159,22 @@ class Shark100(ModbusTCPCSVMapDevice):
 		self.update_interval(10)
 
 	def sample_success(self, addr, regs):
-		super(Shark100, self).sample_success(addr, regs)
-		self.sn = self.latest_sample['SerialNumber'].strip(' ')
+		try:
+			self.latest_sample_time = datetime.datetime.utcnow()
+			self.latest_sample = self._parse_from_map(addr, regs)
+
+			if 'SerialNumber' in self.latest_sample:
+				self.sn = self.latest_sample['SerialNumber'].strip(' ')
+
+			rt_names = [self.map[x]['name'] for x in self.map if self.map[x]['store'] & STORE_RT]
+			rt = {n: self.latest_sample[n] for n in rt_names if n in self.latest_sample}
+
+			if rt:
+				self.fire(store_sample(self.get_dev_id(), self.latest_sample_time, rt))
+
+		except Exception as e:
+			logging.exception("Parsing failure: %s", e)
+
 
 @register_device_type
 class SEL735(ModbusTCPDevice):

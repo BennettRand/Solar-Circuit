@@ -8,7 +8,7 @@ class discover(Event):
 	'''Discovery loop event'''
 
 class DeviceManager(Component):
-	DISCOVERY_INTERVAL = 60
+	DISCOVERY_INTERVAL = 60*10
 	def __init__(self):
 		super(DeviceManager, self).__init__()
 
