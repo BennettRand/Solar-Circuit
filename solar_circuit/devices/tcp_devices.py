@@ -4,7 +4,7 @@ import random
 import datetime
 import csv
 import base64
-from circuits import Component, Timer, task
+from circuits import Component, Timer, task, Event
 
 from solar_circuit.libs.pyModbusTCP.client import ModbusClient
 from solar_circuit.libs import prettytable
@@ -39,15 +39,28 @@ class ModbusTCPDevice(Component):
 		self.queued_time = time.time()
 		self.time_d = 0
 		self.sample_pending = False
+		self.asap = False
+
+	def set_asap_sampling(self, flag):
+		if self.sample_timer is None:
+			return False
+
+		self.sample_timer.persist = not flag
+		self.asap = flag
+
+		if flag:
+			self.fire(sample(), self)
+		else:
+			self.sample_timer.reset(self.sample_timer.interval)
 
 	def _set_channel(self):
 		self.channel = self.__class__.__name__ + str(id(self))
 
 	def started(self, *args):
 		self.conn = ModbusClient(host=self.ip, port=self.MODBUS_PORT,
-								 auto_open=True, auto_close=True)
+								 auto_open=True)
 		self.fire(sample(), self)
-		self.sample_timer = Timer(self.DEFAULT_INTERVAL + random.uniform(0,1), sample(),
+		self.sample_timer = Timer(self.DEFAULT_INTERVAL + random.uniform(0, 1), sample(),
 								  self, persist=True).register(self)
 		return
 
@@ -91,6 +104,9 @@ class ModbusTCPDevice(Component):
 		self.time_d = time.time() - self.queued_time
 		logging.debug("Sampling %s took %s", self.get_dev_id(), self.time_d)
 		self.sample_pending = False
+		if self.asap:
+			logging.debug("%s firing ASAP sample", self.get_dev_id())
+			self.fire(sample(), self)
 		if self.time_d > self.sample_timer.interval:
 			logging.warn("Sampling %s took %s! (> %s)", self.get_dev_id(),
 						 self.time_d, self.sample_timer.interval)
@@ -156,7 +172,8 @@ class Shark100(ModbusTCPCSVMapDevice):
 
 	def started(self, *args):
 		super(Shark100, self).started(args)
-		self.update_interval(10)
+		self.update_interval(60*60)
+		self.set_asap_sampling(True)
 
 	def sample_success(self, addr, regs):
 		try:
