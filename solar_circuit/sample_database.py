@@ -15,6 +15,9 @@ DATABASE = None
 class store_sample(Event):
 	pass
 
+class store_cr_pair(Event):
+	pass
+
 class clear_old(Event):
 	pass
 
@@ -29,8 +32,19 @@ utc TIMESTAMP,
 channel TEXT,
 value REAL)"""
 
+CR_DB_SCHEMA = """CREATE TABLE IF NOT EXISTS commandresponse
+(crid INTEGER PRIMARY KEY ASC,
+dev_id TEXT,
+utc TIMESTAMP,
+command TEXT,
+response TEXT)"""
+
 INSERT_TEMPLATE = """INSERT INTO samples
 (dev_id, utc, channel, value)
+VALUES (?, ?, ?, ?)"""
+
+CR_INSERT_TEMPLATE = """INSERT INTO commandresponse
+(dev_id, utc, command, response)
 VALUES (?, ?, ?, ?)"""
 
 DELETE_TEMPLATE = """DELETE FROM samples
@@ -50,6 +64,7 @@ class SampleDatabase(Component):
 		logging.info("Opening database %s", self.DB_PATH)
 		DATABASE = sqlite3.connect(self.DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
 		DATABASE.cursor().execute(DB_SCHEMA)
+		DATABASE.cursor().execute(CR_DB_SCHEMA)
 		DATABASE.commit()
 		self.clear_timer = Timer(60, clear_old(), self, persist=True).register(self)
 
@@ -64,6 +79,14 @@ class SampleDatabase(Component):
 			DATABASE.commit()
 		except Exception as e:
 			logging.exception("RT Sample Store Error: %s, %s", e, sample_dict)
+
+	def store_cr_pair(self, dev_id, utctime, command, response):
+		try:
+			DATABASE.cursor().execute(CR_INSERT_TEMPLATE,
+									  (dev_id, utctime, command, response))
+			DATABASE.commit()
+		except Exception as e:
+			logging.exception("Command Response Store Error: %s, %s", e, dev_id)
 
 	def clear_old(self, hours=24):
 		if DATABASE is None:

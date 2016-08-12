@@ -10,7 +10,7 @@ from solar_circuit.libs.pyModbusTCP.client import ModbusClient
 from solar_circuit.libs import prettytable
 from solar_circuit.utility.helpers import stringify_reg, power_error, minimize_addresses, make_rtu_pair
 from solar_circuit.utility import formats
-from solar_circuit.sample_database import store_sample
+from solar_circuit.sample_database import store_sample, store_cr_pair
 from . import sample, sample_success
 
 TCP_DEV_NAMES = {}
@@ -57,7 +57,7 @@ class ModbusTCPDevice(Component):
 		self.channel = self.__class__.__name__ + str(id(self))
 
 	def started(self, *args):
-		self.conn = ModbusClient(host=self.ip, port=self.MODBUS_PORT,
+		self.conn = ModbusClient(host=self.ip[0], port=self.ip[1],
 								 auto_open=True)
 		self.fire(sample(), self)
 		self.sample_timer = Timer(self.DEFAULT_INTERVAL + random.uniform(0, 1), sample(),
@@ -160,7 +160,9 @@ class ModbusTCPCSVMapDevice(ModbusTCPDevice):
 		return new_sample
 
 	def sample_success(self, addr, regs):
-		pass
+		c, r = make_rtu_pair(1, addr, regs)
+		self.fire(store_cr_pair(self.get_dev_id(), datetime.datetime.utcnow(),
+								stringify_reg(c), stringify_reg(r)))
 
 @register_device_type
 class Shark100(ModbusTCPCSVMapDevice):

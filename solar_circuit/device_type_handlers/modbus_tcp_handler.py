@@ -27,7 +27,10 @@ class ModbusTCPHandler(Component):
 		with open(fn, 'r') as f:
 			for ip in f.readlines():
 				if not ip.startswith("#"):
-					ip_set.add(ip.rstrip("\n\r"))
+					if ":" in ip:
+						ip_set.add((ip.split(":")[0], int(ip.split(":")[1].rstrip("\n\r"))))
+					else:
+						ip_set.add((ip.rstrip("\n\r"),502))
 		self.ip_scan_list |= ip_set
 
 	def _get_ip_scan_list(self):
@@ -49,24 +52,24 @@ class ModbusTCPHandler(Component):
 			self.fire(task(self._discover, ip), "discovery_worker")
 
 	def _discover(self, ip):
-		logging.info("Discovering %s", ip)
+		logging.info("Discovering %s:%s", ip[0], ip[1])
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		s.settimeout(self.MODBUS_TIMEOUT)
 		try:
-			s.connect((ip, self.MODBUS_PORT))
+			s.connect((ip[0], ip[1]))
 		except socket.error as e:
-			logging.warn("No connection at %s port %s", ip, self.MODBUS_PORT)
+			logging.warn("No connection at %s port %s", ip[0], ip[1])
 		else:
-			logging.info("%s has port %s open.", ip, self.MODBUS_PORT)
+			logging.info("%s has port %s open.", ip[0], ip[1])
 			s.close()
-			mbc = ModbusClient(host=ip, port=self.MODBUS_PORT,
+			mbc = ModbusClient(host=ip[0], port=ip[1],
 							   auto_open=True, auto_close=True)
 			for rule in self._load_discovery_rules():
-				logging.debug("Trying %s on %s", rule['dev_name'], ip)
+				logging.debug("Trying %s on %s", rule['dev_name'], ip[0])
 				regs = mbc.read_holding_registers(int(rule['addr']), int(rule['size']))
 				logging.debug("Is %s in %s", rule['expected'], stringify_reg(regs))
 				if rule['expected'].upper() in stringify_reg(regs).upper():
-					logging.info("%s is of type %s", ip, rule['dev_name'])
+					logging.info("%s is of type %s", ip[0], rule['dev_name'])
 					try:
 						d = tcp_devices.TCP_DEV_NAMES[rule['dev_name']](ip)
 						d.started()

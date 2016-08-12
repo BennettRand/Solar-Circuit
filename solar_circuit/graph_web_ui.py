@@ -106,6 +106,30 @@ class WebUI(Controller):
 
 		return SHOW_TEMPLATE.safe_substitute(container=chart.container,
 											  chart=chart.script())
+	def fastgraph(self, dev_id, hours=.25):
+		logging.info("Fast graphing %s from the last %s hours", dev_id, hours)
+		chart = Chart(title={'text':dev_id},
+				  yAxis={'title': {'text': 'Power (Watts)'}},
+				  xAxis={'type': 'datetime'})
+		curr = get_database().cursor()
+		try:
+			start_t = time.time()
+			curr.execute("SELECT * FROM samples WHERE dev_id=? AND channel='Power' AND utc > datetime('now', '-{} hours') ORDER BY utc ASC".format(hours),
+						 (dev_id,))
+			resp = curr.fetchall()
+			logging.info("Query took %s seconds", time.time() - start_t)
+		except Exception as e:
+			logging.exception(e)
+
+		chart.add_data_series(ChartTypes.spline, [(t, int(v)) for x,y,t,a,v in resp],
+							  name='Power',
+							  visible=True,
+							  animation=False,
+							  marker={'enabled': False},
+							  color='black')
+
+		return SHOW_TEMPLATE.safe_substitute(container=chart.container,
+											  chart=chart.script())
 
 	def exit(self):
 		logging.critical("Exit command recieved")
